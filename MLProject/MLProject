@@ -1,0 +1,17 @@
+name: career_job_classifier
+
+conda_env: conda.yaml
+
+entry_points:
+  main:
+    parameters:
+      dataset_path: {type: str, default: "jobs_preprocessing.csv"}
+      max_features: {type: int, default: 5000}
+      C: {type: float, default: 1.0}
+      max_iter: {type: int, default: 1000}
+    command: >
+      python modelling.py
+        --dataset {dataset_path}
+        --max_features {max_features}
+        --C {C}
+        --max_iter {max_iter}
