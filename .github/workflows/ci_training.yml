@@ -9,7 +9,7 @@ on:
 
 jobs:
   train-and-build:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
       - name: Checkout repository
@@ -79,3 +79,4 @@ jobs:
           docker push adinplb/career-job-classifier:latest
           docker push adinplb/career-job-classifier:${{ github.run_number }}
           echo "Image pushed: adinplb/career-job-classifier:${{ github.run_number }}"
+
