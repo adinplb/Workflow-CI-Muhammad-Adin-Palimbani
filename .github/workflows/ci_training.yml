@@ -34,51 +34,8 @@ jobs:
         shell: powershell
         run: |
           if (Test-Path "MLProject\mlflow_run_id.txt") {
-            echo "Run ID: $(Get-Content MLProject\mlflow_run_id.txt)"
-          }
-          echo "Training completed successfully."
-
-      - name: Read MLflow Run ID
-        id: run_id
-        shell: powershell
-        run: |
-          $RUN_ID = if (Test-Path "MLProject\mlflow_run_id.txt") { Get-Content "MLProject\mlflow_run_id.txt" } else { "latest" }
-          echo "run_id=$RUN_ID" >> $env:GITHUB_OUTPUT
-          echo "Run ID: $RUN_ID"
-
-      - name: Check Docker availability
-        id: docker_check
-        shell: powershell
-        run: |
-          $dockerAvailable = $null -ne (Get-Command docker -ErrorAction SilentlyContinue)
-          if ($dockerAvailable) {
-            echo "available=true" >> $env:GITHUB_OUTPUT
-            echo "Docker is available"
+            $RUN_ID = Get-Content "MLProject\mlflow_run_id.txt"
+            echo "Training berhasil. Run ID: $RUN_ID"
           } else {
-            echo "available=false" >> $env:GITHUB_OUTPUT
-            echo "Docker not available, skipping build and push steps"
+            echo "Training completed successfully."
           }
-
-      - name: Build Docker image with MLflow
-        if: steps.docker_check.outputs.available == 'true'
-        shell: powershell
-        env:
-          MLFLOW_TRACKING_URI: mlruns
-        run: |
-          $RUN_ID = "${{ steps.run_id.outputs.run_id }}"
-          mlflow models build-docker -m "runs:/$RUN_ID/model" -n "adinplb/career-job-classifier" --enable-mlserver
-
-      - name: Login to Docker Hub
-        if: steps.docker_check.outputs.available == 'true'
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Push Docker image to Docker Hub
-        if: steps.docker_check.outputs.available == 'true'
-        shell: powershell
-        run: |
-          docker tag adinplb/career-job-classifier:latest adinplb/career-job-classifier:${{ github.run_number }}
-          docker push adinplb/career-job-classifier:latest
-          docker push adinplb/career-job-classifier:${{ github.run_number }}
