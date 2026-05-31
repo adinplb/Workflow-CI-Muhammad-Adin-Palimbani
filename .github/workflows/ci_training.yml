@@ -7,6 +7,9 @@ on:
       - 'MLProject/**'
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   train-and-build:
     runs-on: self-hosted
@@ -19,12 +22,14 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install mlflow==2.19.0 dagshub scikit-learn pandas numpy matplotlib nltk
+        shell: powershell
 
       - name: Configure DagsHub credentials
         env:
           DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
         run: |
           python -c "import dagshub, os; dagshub.auth.add_app_token(os.environ['DAGSHUB_TOKEN'])"
+        shell: powershell
 
       - name: Run MLflow Project training
         env:
@@ -33,6 +38,7 @@ jobs:
           MLFLOW_TRACKING_PASSWORD: ${{ secrets.DAGSHUB_TOKEN }}
         run: |
           mlflow run MLProject/ --env-manager=local -P dataset_path=MLProject/jobs_preprocessing.csv
+        shell: powershell
 
       - name: Upload training artifacts to GitHub
         uses: actions/upload-artifact@v4
@@ -46,20 +52,23 @@ jobs:
       - name: Read MLflow Run ID
         id: run_id
         run: |
-          RUN_ID=$(cat MLProject/mlflow_run_id.txt 2>/dev/null || echo "latest")
-          echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
+          $RUN_ID = if (Test-Path "MLProject/mlflow_run_id.txt") { Get-Content "MLProject/mlflow_run_id.txt" } else { "latest" }
+          echo "run_id=$RUN_ID" >> $env:GITHUB_OUTPUT
           echo "Run ID: $RUN_ID"
+        shell: powershell
 
       - name: Check Docker availability
         id: docker_check
         run: |
-          if command -v docker &> /dev/null; then
-            echo "available=true" >> $GITHUB_OUTPUT
-          else
-            echo "available=false" >> $GITHUB_OUTPUT
+          $dockerAvailable = $null -ne (Get-Command docker -ErrorAction SilentlyContinue)
+          if ($dockerAvailable) {
+            echo "available=true" >> $env:GITHUB_OUTPUT
+            echo "Docker is available"
+          } else {
+            echo "available=false" >> $env:GITHUB_OUTPUT
             echo "Docker not available, skipping build and push steps"
-          fi
-        shell: bash
+          }
+        shell: powershell
 
       - name: Build Docker image with MLflow
         if: steps.docker_check.outputs.available == 'true'
@@ -68,11 +77,9 @@ jobs:
           MLFLOW_TRACKING_USERNAME: adinplb
           MLFLOW_TRACKING_PASSWORD: ${{ secrets.DAGSHUB_TOKEN }}
         run: |
-          RUN_ID=${{ steps.run_id.outputs.run_id }}
-          mlflow models build-docker \
-            -m "runs:/${RUN_ID}/model" \
-            -n "adinplb/career-job-classifier" \
-            --enable-mlserver
+          $RUN_ID = "${{ steps.run_id.outputs.run_id }}"
+          mlflow models build-docker -m "runs:/$RUN_ID/model" -n "adinplb/career-job-classifier" --enable-mlserver
+        shell: powershell
 
       - name: Login to Docker Hub
         if: steps.docker_check.outputs.available == 'true'
@@ -87,4 +94,4 @@ jobs:
           docker tag adinplb/career-job-classifier:latest adinplb/career-job-classifier:${{ github.run_number }}
           docker push adinplb/career-job-classifier:latest
           docker push adinplb/career-job-classifier:${{ github.run_number }}
-          echo "Image pushed: adinplb/career-job-classifier:${{ github.run_number }}"
+        shell: powershell
