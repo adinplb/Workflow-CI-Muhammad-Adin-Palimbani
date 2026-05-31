@@ -9,16 +9,11 @@ on:
 
 jobs:
   train-and-build:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Setup Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12.7'
 
       - name: Install MLflow and dependencies
         run: |
@@ -55,7 +50,19 @@ jobs:
           echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
           echo "Run ID: $RUN_ID"
 
+      - name: Check Docker availability
+        id: docker_check
+        run: |
+          if command -v docker &> /dev/null; then
+            echo "available=true" >> $GITHUB_OUTPUT
+          else
+            echo "available=false" >> $GITHUB_OUTPUT
+            echo "Docker not available, skipping build and push steps"
+          fi
+        shell: bash
+
       - name: Build Docker image with MLflow
+        if: steps.docker_check.outputs.available == 'true'
         env:
           MLFLOW_TRACKING_URI: https://dagshub.com/adinplb/Eksperimen_SML_Muhammad-Adin-Palimbani.mlflow
           MLFLOW_TRACKING_USERNAME: adinplb
@@ -68,15 +75,16 @@ jobs:
             --enable-mlserver
 
       - name: Login to Docker Hub
+        if: steps.docker_check.outputs.available == 'true'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Push Docker image to Docker Hub
+        if: steps.docker_check.outputs.available == 'true'
         run: |
           docker tag adinplb/career-job-classifier:latest adinplb/career-job-classifier:${{ github.run_number }}
           docker push adinplb/career-job-classifier:latest
           docker push adinplb/career-job-classifier:${{ github.run_number }}
           echo "Image pushed: adinplb/career-job-classifier:${{ github.run_number }}"
-
