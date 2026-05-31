@@ -1,11 +1,5 @@
 """
 modelling.py — MLflow Project entry point (Kriteria 3)
-Melatih model klasifikasi pekerjaan dengan parameter CLI.
-Tracking disimpan via MLFLOW_TRACKING_URI environment variable.
-
-Usage:
-    python modelling.py
-    python modelling.py --dataset jobs_preprocessing.csv --max_features 5000 --C 1.0 --max_iter 1000
 """
 
 import argparse
@@ -30,9 +24,6 @@ from sklearn.metrics import (
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 
-if not os.getenv("MLFLOW_TRACKING_URI"):
-    mlflow.set_tracking_uri("mlruns")
-
 LABEL_NAMES = [
     "Education", "Engineering", "Finance & Accounting", "Healthcare",
     "Human Resources", "IT & Software", "Marketing & Sales",
@@ -48,15 +39,6 @@ def main(dataset_path, max_features, C, max_iter):
         X, y, test_size=0.2, random_state=42, stratify=y
     )
 
-    # mlflow run sudah membuat active run secara otomatis via MLFLOW_RUN_ID env var
-    # Jangan panggil start_run() lagi agar tidak konflik
-    active_run = mlflow.active_run()
-    should_end = False
-    if active_run is None:
-        mlflow.set_experiment("Indonesian Job Classification - CI")
-        active_run = mlflow.start_run(run_name="ci_training")
-        should_end = True
-
     pipeline = Pipeline([
         ("tfidf", TfidfVectorizer(max_features=max_features, sublinear_tf=True, ngram_range=(1, 2))),
         ("clf", LogisticRegression(C=C, max_iter=max_iter, random_state=42)),
@@ -69,6 +51,7 @@ def main(dataset_path, max_features, C, max_iter):
     precision = precision_score(y_test, y_pred, average="weighted")
     recall = recall_score(y_test, y_pred, average="weighted")
 
+    # Log ke active run yang dibuat oleh mlflow run
     mlflow.log_param("max_features", max_features)
     mlflow.log_param("C", C)
     mlflow.log_param("max_iter", max_iter)
@@ -91,9 +74,6 @@ def main(dataset_path, max_features, C, max_iter):
 
     print(f"Training selesai. Run ID: {run_id}")
     print(f"Accuracy: {acc:.4f} | F1: {f1:.4f}")
-
-    if should_end:
-        mlflow.end_run()
 
 
 if __name__ == "__main__":

@@ -27,8 +27,7 @@ jobs:
       - name: Run MLflow Project training
         shell: powershell
         run: |
-          cd MLProject
-          python modelling.py --dataset jobs_preprocessing.csv --max_features 5000 --C 1.0 --max_iter 1000
+          mlflow run MLProject --env-manager=local -P dataset_path=MLProject/jobs_preprocessing.csv
 
       - name: Show training results
         shell: powershell
