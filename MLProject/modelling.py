@@ -15,7 +15,6 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
-import dagshub
 import mlflow
 import mlflow.sklearn
 import pandas as pd
@@ -31,11 +30,10 @@ from sklearn.metrics import (
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 
-dagshub.init(
-    repo_owner="adinplb",
-    repo_name="Eksperimen_SML_Muhammad-Adin-Palimbani",
-    mlflow=True,
-)
+# Gunakan MLFLOW_TRACKING_URI dari environment variable (local mlruns atau DagsHub)
+# Jika tidak diset, default ke local
+if not os.getenv("MLFLOW_TRACKING_URI"):
+    mlflow.set_tracking_uri("mlruns")
 
 LABEL_NAMES = [
     "Education", "Engineering", "Finance & Accounting", "Healthcare",
