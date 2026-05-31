@@ -1,7 +1,7 @@
 """
 modelling.py — MLflow Project entry point (Kriteria 3)
 Melatih model klasifikasi pekerjaan dengan parameter CLI.
-Tracking disimpan ke DagsHub via environment variables.
+Tracking disimpan via MLFLOW_TRACKING_URI environment variable.
 
 Usage:
     python modelling.py
@@ -30,8 +30,6 @@ from sklearn.metrics import (
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 
-# Gunakan MLFLOW_TRACKING_URI dari environment variable (local mlruns atau DagsHub)
-# Jika tidak diset, default ke local
 if not os.getenv("MLFLOW_TRACKING_URI"):
     mlflow.set_tracking_uri("mlruns")
 
@@ -50,43 +48,52 @@ def main(dataset_path, max_features, C, max_iter):
         X, y, test_size=0.2, random_state=42, stratify=y
     )
 
-    mlflow.set_experiment("Indonesian Job Classification - CI")
+    # mlflow run sudah membuat active run secara otomatis via MLFLOW_RUN_ID env var
+    # Jangan panggil start_run() lagi agar tidak konflik
+    active_run = mlflow.active_run()
+    should_end = False
+    if active_run is None:
+        mlflow.set_experiment("Indonesian Job Classification - CI")
+        active_run = mlflow.start_run(run_name="ci_training")
+        should_end = True
 
-    with mlflow.start_run(run_name="ci_training"):
-        pipeline = Pipeline([
-            ("tfidf", TfidfVectorizer(max_features=max_features, sublinear_tf=True, ngram_range=(1, 2))),
-            ("clf", LogisticRegression(C=C, max_iter=max_iter, random_state=42)),
-        ])
-        pipeline.fit(X_train, y_train)
-        y_pred = pipeline.predict(X_test)
+    pipeline = Pipeline([
+        ("tfidf", TfidfVectorizer(max_features=max_features, sublinear_tf=True, ngram_range=(1, 2))),
+        ("clf", LogisticRegression(C=C, max_iter=max_iter, random_state=42)),
+    ])
+    pipeline.fit(X_train, y_train)
+    y_pred = pipeline.predict(X_test)
 
-        acc = accuracy_score(y_test, y_pred)
-        f1 = f1_score(y_test, y_pred, average="weighted")
-        precision = precision_score(y_test, y_pred, average="weighted")
-        recall = recall_score(y_test, y_pred, average="weighted")
+    acc = accuracy_score(y_test, y_pred)
+    f1 = f1_score(y_test, y_pred, average="weighted")
+    precision = precision_score(y_test, y_pred, average="weighted")
+    recall = recall_score(y_test, y_pred, average="weighted")
 
-        mlflow.log_param("max_features", max_features)
-        mlflow.log_param("C", C)
-        mlflow.log_param("max_iter", max_iter)
-        mlflow.log_metric("accuracy", acc)
-        mlflow.log_metric("f1_weighted", f1)
-        mlflow.log_metric("precision_weighted", precision)
-        mlflow.log_metric("recall_weighted", recall)
+    mlflow.log_param("max_features", max_features)
+    mlflow.log_param("C", C)
+    mlflow.log_param("max_iter", max_iter)
+    mlflow.log_metric("accuracy", acc)
+    mlflow.log_metric("f1_weighted", f1)
+    mlflow.log_metric("precision_weighted", precision)
+    mlflow.log_metric("recall_weighted", recall)
 
-        mlflow.sklearn.log_model(pipeline, "model")
+    mlflow.sklearn.log_model(pipeline, "model")
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            report_path = os.path.join(tmpdir, "classification_report.txt")
-            with open(report_path, "w") as f:
-                f.write(classification_report(y_test, y_pred, target_names=LABEL_NAMES))
-            mlflow.log_artifact(report_path)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        report_path = os.path.join(tmpdir, "classification_report.txt")
+        with open(report_path, "w", encoding="utf-8") as f:
+            f.write(classification_report(y_test, y_pred, target_names=LABEL_NAMES))
+        mlflow.log_artifact(report_path)
 
-        run_id = mlflow.active_run().info.run_id
-        with open("mlflow_run_id.txt", "w") as f:
-            f.write(run_id)
+    run_id = mlflow.active_run().info.run_id
+    with open("mlflow_run_id.txt", "w") as f:
+        f.write(run_id)
 
-        print(f"Training selesai. Run ID: {run_id}")
-        print(f"Accuracy: {acc:.4f} | F1: {f1:.4f}")
+    print(f"Training selesai. Run ID: {run_id}")
+    print(f"Accuracy: {acc:.4f} | F1: {f1:.4f}")
+
+    if should_end:
+        mlflow.end_run()
 
 
 if __name__ == "__main__":

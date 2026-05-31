@@ -24,21 +24,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install mlflow==2.19.0 dagshub scikit-learn pandas numpy matplotlib nltk
 
-      - name: Run MLflow Project training (local tracking)
+      - name: Run MLflow Project training
         shell: powershell
-        env:
-          MLFLOW_TRACKING_URI: mlruns
-          MLFLOW_TRACKING_USERNAME: adinplb
-          MLFLOW_TRACKING_PASSWORD: ${{ secrets.DAGSHUB_TOKEN }}
         run: |
-          mlflow run MLProject/ --env-manager=local -P dataset_path=MLProject/jobs_preprocessing.csv
+          cd MLProject
+          python modelling.py --dataset jobs_preprocessing.csv --max_features 5000 --C 1.0 --max_iter 1000
 
       - name: Upload training artifacts to GitHub
         uses: actions/upload-artifact@v4
         with:
           name: mlflow-artifacts-${{ github.run_number }}
           path: |
-            mlruns/
+            MLProject/mlruns/
             MLProject/mlflow_run_id.txt
           retention-days: 30
 
@@ -46,7 +43,7 @@ jobs:
         id: run_id
         shell: powershell
         run: |
-          $RUN_ID = if (Test-Path "MLProject/mlflow_run_id.txt") { Get-Content "MLProject/mlflow_run_id.txt" } else { "latest" }
+          $RUN_ID = if (Test-Path "MLProject\mlflow_run_id.txt") { Get-Content "MLProject\mlflow_run_id.txt" } else { "latest" }
           echo "run_id=$RUN_ID" >> $env:GITHUB_OUTPUT
           echo "Run ID: $RUN_ID"
 
