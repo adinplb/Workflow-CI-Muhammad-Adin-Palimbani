@@ -30,14 +30,13 @@ jobs:
           cd MLProject
           python modelling.py --dataset jobs_preprocessing.csv --max_features 5000 --C 1.0 --max_iter 1000
 
-      - name: Upload training artifacts to GitHub
-        uses: actions/upload-artifact@v4
-        with:
-          name: mlflow-artifacts-${{ github.run_number }}
-          path: |
-            MLProject/mlruns/
-            MLProject/mlflow_run_id.txt
-          retention-days: 30
+      - name: Show training results
+        shell: powershell
+        run: |
+          if (Test-Path "MLProject\mlflow_run_id.txt") {
+            echo "Run ID: $(Get-Content MLProject\mlflow_run_id.txt)"
+          }
+          echo "Training completed successfully."
 
       - name: Read MLflow Run ID
         id: run_id
